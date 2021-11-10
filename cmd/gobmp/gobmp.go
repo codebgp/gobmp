@@ -16,6 +16,7 @@ import (
 	"github.com/sbezverk/gobmp/pkg/dumper"
 	"github.com/sbezverk/gobmp/pkg/filer"
 	"github.com/sbezverk/gobmp/pkg/gobmpsrv"
+	phttp "github.com/sbezverk/gobmp/pkg/http"
 	"github.com/sbezverk/gobmp/pkg/kafka"
 	"github.com/sbezverk/gobmp/pkg/pub"
 )
@@ -64,6 +65,14 @@ func setupSignalHandler() (stopCh <-chan struct{}) {
 	return stop
 }
 
+func serveHTTP(port int, routes *[]phttp.Route, done <-chan struct{}) error {
+	server, err := phttp.NewServer(port, routes)
+	if err != nil {
+		return err
+	}
+	return server.Run(done)
+}
+
 func main() {
 	flag.Parse()
 	_ = flag.Set("logtostderr", "true")
@@ -107,6 +116,28 @@ func main() {
 	}
 	// Starting Interceptor server
 	bmpSrv.Start()
+
+	httpPortStr, ok := os.LookupEnv("HTTP_PORT")
+	if !ok {
+		glog.Errorf("empty HTTP_PORT env var")
+		os.Exit(1)
+	}
+	httpPort, err := strconv.Atoi(httpPortStr)
+	if err != nil {
+		glog.Errorf("not integer HTTP_PORT env var")
+		os.Exit(1)
+	}
+
+	// http server
+	routes := phttp.LoadDefaultRoutes()
+	var httpDone = make(chan struct{})
+	go func() {
+		err = serveHTTP(httpPort, routes, httpDone)
+		if err != nil {
+			glog.Errorf("http server errored out")
+		}
+		close(httpDone)
+	}()
 
 	stopCh := setupSignalHandler()
 	<-stopCh
