@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"time"
 
@@ -34,6 +35,10 @@ const (
 	flowspecMessageTopic   = "gobmp.parsed.flowspec"
 	flowspecMessageV4Topic = "gobmp.parsed.flowspec_v4"
 	flowspecMessageV6Topic = "gobmp.parsed.flowspec_v6"
+
+	// topicNamespaceEnvVariableName is an optional environment variable
+	// to support namespacing of gobgmp Kafka topics.
+	topicNamespaceEnvVariableName = "TOPIC_NAMESPACE"
 )
 
 var (
@@ -124,7 +129,7 @@ func (p *publisher) produceMessage(topic string, key []byte, msg []byte) error {
 	m := sarama.ByteEncoder{}
 	m = msg
 	p.producer.Input() <- &sarama.ProducerMessage{
-		Topic: topic,
+		Topic: namespaceTopicName(topic, os.LookupEnv),
 		Key:   k,
 		Value: m,
 	}
@@ -218,6 +223,7 @@ func validator(addr string) error {
 }
 
 func ensureTopic(br *sarama.Broker, timeout time.Duration, topicName string) error {
+	topicName = namespaceTopicName(topicName, os.LookupEnv)
 	topic := &sarama.CreateTopicsRequest{
 		TopicDetails: map[string]*sarama.TopicDetail{
 			topicName: {
@@ -272,4 +278,14 @@ func waitForBrokerConnection(br *sarama.Broker, timeout time.Duration) error {
 		}
 	}
 
+}
+
+// namespaceTopicName prepend an optional namespace to the topic name.
+// This enables running multiple gobmp services and namespacing their Kafka messages
+// while using a single Kafka cluster.
+func namespaceTopicName(topicName string, envLookupFunc func(string) (string, bool)) string {
+	if topicNamespace, ok := envLookupFunc(topicNamespaceEnvVariableName); ok {
+		return fmt.Sprintf("%s.%s", topicNamespace, topicName)
+	}
+	return topicName
 }
