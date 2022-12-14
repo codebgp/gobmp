@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/go-test/deep"
 	"github.com/sbezverk/gobmp/pkg/base"
 )
 
@@ -12,6 +13,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 		name   string
 		input  []byte
 		expect *base.MPNLRI
+		pathID bool
 	}{
 		{
 			name:  "mp unicast nlri 1",
@@ -19,12 +21,12 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 			expect: &base.MPNLRI{
 				NLRI: []base.Route{
 					{
-						PathID: 0,
 						Length: 0x18,
 						Prefix: []byte{0x0a, 0x00, 0x82},
 					},
 				},
 			},
+			pathID: false,
 		},
 		{
 			name:  "mp unicast nlri 2",
@@ -38,6 +40,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
 		},
 		{
 			name:  "mp unicast nlri 3",
@@ -71,6 +74,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
 		},
 		{
 			name:  "Default prefix",
@@ -83,6 +87,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: false,
 		},
 		{
 			name:  "Panic case #1",
@@ -96,6 +101,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
 		},
 		{
 			name:  "Panic case #2",
@@ -129,6 +135,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
 		},
 		{
 			name:  "Panic case #3",
@@ -142,6 +149,7 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
 		},
 		{
 			name:  "issue_173",
@@ -154,16 +162,18 @@ func TestUnmarshalUnicastNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := UnmarshalUnicastNLRI(tt.input)
+			got, err := UnmarshalUnicastNLRI(tt.input, tt.pathID)
 			if err != nil {
 				t.Fatalf("test failed with error: %+v", err)
 			}
 			if !reflect.DeepEqual(tt.expect, got) {
-				t.Fatalf("test failed as expected nlri %+v does not match actual nlri %+v", tt.expect, got)
+				t.Logf("Differences: %+v", deep.Equal(tt.expect, got))
+				t.Fatal("test failed as expected nlri does not match actual nlri")
 			}
 		})
 	}
@@ -174,6 +184,7 @@ func TestUnmarshalLUNLRI(t *testing.T) {
 		name   string
 		input  []byte
 		expect *base.MPNLRI
+		pathID bool
 	}{
 		{
 			name:  "mp unicast nlri 1",
@@ -193,6 +204,7 @@ func TestUnmarshalLUNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: false,
 		},
 		{
 			name:  "mp unicast nlri 2",
@@ -212,6 +224,7 @@ func TestUnmarshalLUNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: false,
 		},
 		{
 			name:  "mp unicast nlri 3",
@@ -280,6 +293,7 @@ func TestUnmarshalLUNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
 		},
 		{
 			name:  "panic case#1",
@@ -306,16 +320,38 @@ func TestUnmarshalLUNLRI(t *testing.T) {
 					},
 				},
 			},
+			pathID: true,
+		},
+		{
+			name:  "panic 11-02-2022",
+			input: []byte{0x38, 0x00, 0x00, 0x31, 0x0A, 0x00, 0x00, 0x07},
+			expect: &base.MPNLRI{
+				NLRI: []base.Route{
+					{
+						Length: 32,
+						Prefix: []byte{0x0A, 0x00, 0x00, 0x07},
+						Label: []*base.Label{
+							{
+								Value: 3,
+								Exp:   0x0,
+								BoS:   true,
+							},
+						},
+					},
+				},
+			},
+			pathID: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := UnmarshalLUNLRI(tt.input)
+			got, err := UnmarshalLUNLRI(tt.input, tt.pathID)
 			if err != nil {
 				t.Fatalf("test failed with error: %+v", err)
 			}
 			if !reflect.DeepEqual(tt.expect, got) {
-				t.Fatalf("test failed as expected nlri %+v does not match actual nlri %+v", tt.expect, got)
+				t.Logf("Differences: %+v", deep.Equal(tt.expect, got))
+				t.Fatal("test failed as expected nlri does not match actual nlri")
 			}
 		})
 	}

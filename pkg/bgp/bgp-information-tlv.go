@@ -2,7 +2,7 @@ package bgp
 
 import (
 	"github.com/golang/glog"
-	"github.com/sbezverk/gobmp/pkg/tools"
+	"github.com/sbezverk/tools"
 )
 
 // InformationalTLV defines BGP informational TLV object
@@ -50,11 +50,11 @@ func UnmarshalBGPTLV(b []byte) ([]InformationalTLV, Capability, error) {
 
 func copyCapabilitiyMap(s, d Capability) {
 	for k, v := range s {
-		src := make([]*capabilityData, len(v))
+		src := make([]*CapabilityData, len(v))
 		copy(src, v)
 		dst, ok := d[k]
 		if !ok {
-			dst = make([]*capabilityData, 0)
+			dst = make([]*CapabilityData, 0)
 		}
 		dst = append(dst, src...)
 		d[k] = dst
