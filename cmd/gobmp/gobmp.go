@@ -97,7 +97,7 @@ func main() {
 	// Starting Interceptor server
 	bmpSrv.Start()
 
-	stopCh := tools.setupSignalHandler()
+	stopCh := tools.SetupSignalHandler()
 	healthCh := healthcheck.EnableProvider(func() error { return nil }, stopCh)
 
 	// Block until signal or health provider fails
