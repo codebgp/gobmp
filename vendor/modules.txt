@@ -9,7 +9,7 @@ github.com/eapache/go-resiliency/breaker
 github.com/eapache/go-xerial-snappy
 # github.com/eapache/queue v1.1.0
 github.com/eapache/queue
-# github.com/go-test/deep v1.0.6
+# github.com/go-test/deep v1.0.8
 ## explicit
 github.com/go-test/deep
 # github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -36,6 +36,9 @@ github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
 # github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 github.com/rcrowley/go-metrics
+# github.com/sbezverk/tools v0.0.0-20220706091339-17ec2f713538
+## explicit
+github.com/sbezverk/tools
 # golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 golang.org/x/crypto/md4
 golang.org/x/crypto/pbkdf2

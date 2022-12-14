@@ -1,5 +1,5 @@
 REGISTRY_NAME?=docker.io/codebgp
-IMAGE_VERSION?=0.0.6
+IMAGE_VERSION?=1.0.0-test
 
 .PHONY: all gobmp player container push clean test
 
