@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/sbezverk/gobmp/pkg/base"
-	"github.com/sbezverk/gobmp/pkg/tools"
+	"github.com/sbezverk/tools"
 )
 
 // RouteTypeSpec defines a method to get a route type specific information
@@ -81,13 +81,8 @@ func (n *NLRI) GetEVPNGWAddr() []byte {
 }
 
 // GetEVPNLabel returns stack of labels found in the nlri
-func (n *NLRI) GetEVPNLabel() []uint32 {
-	label := make([]uint32, 0)
-	for _, l := range n.RouteTypeSpec.getLabel() {
-		label = append(label, l.Value)
-	}
-
-	return label
+func (n *NLRI) GetEVPNLabel() []*base.Label {
+	return n.RouteTypeSpec.getLabel()
 }
 
 // UnmarshalEVPNNLRI instantiates an EVPN NLRI object
@@ -131,7 +126,7 @@ func UnmarshalEVPNNLRI(b []byte) (*Route, error) {
 				return nil, err
 			}
 		case 5:
-			n.RouteTypeSpec, err = UnmarshalEVPNIPPrefix(b[p : p+l])
+			n.RouteTypeSpec, err = UnmarshalEVPNIPPrefix(b[p:p+l], l)
 			if err != nil {
 				return nil, err
 			}

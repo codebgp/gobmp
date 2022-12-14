@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/sbezverk/gobmp/pkg/tools"
+	"github.com/sbezverk/tools"
 )
 
 // Label defines a structure of a single label
@@ -17,6 +17,16 @@ type Label struct {
 // String returns a string representation of the label information
 func (l *Label) String() string {
 	return fmt.Sprintf("Label: %d Exp: %02x BoS: %t", l.Value, l.Exp, l.BoS)
+}
+
+// GetRawValue returns a value of label which composed of all 24bits.
+// Raw values may needed where label represents unordinary mpls label, like vni in vxlan evpn e.t.c
+func (l *Label) GetRawValue() uint32 {
+	value := l.Value*16 + uint32(l.Exp*2)
+	if l.BoS {
+		value++
+	}
+	return value
 }
 
 // MakeLabel instantiates a new Label object
@@ -38,7 +48,7 @@ func MakeLabel(b []byte, srv6 ...bool) (*Label, error) {
 	}
 	l.Value >>= 4
 	// Move Exp bits to the beggining of the byte and leave only 3 bits, mask the rest.
-	l.Exp = uint8(b[2]&0x07) >> 1
+	l.Exp = uint8(b[2]&0x0E) >> 1
 	l.BoS = b[2]&0x01 == 1
 
 	return &l, nil

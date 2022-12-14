@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/go-test/deep"
 	"github.com/sbezverk/gobmp/pkg/base"
 )
 
@@ -14,6 +15,7 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 		expect *base.MPNLRI
 		fail   bool
 		srv6   bool
+		pathID bool
 	}{
 		{
 			name:  "nlri 1",
@@ -21,7 +23,6 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 			expect: &base.MPNLRI{
 				NLRI: []base.Route{
 					{
-						PathID: 0,
 						Length: 32,
 						Label: []*base.Label{
 							{
@@ -38,7 +39,8 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 					},
 				},
 			},
-			fail: false,
+			pathID: false,
+			fail:   false,
 		},
 		{
 			name:  "nlri 2",
@@ -46,7 +48,6 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 			expect: &base.MPNLRI{
 				NLRI: []base.Route{
 					{
-						PathID: 0,
 						Length: 24,
 						Label: []*base.Label{
 							{
@@ -63,7 +64,8 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 					},
 				},
 			},
-			fail: false,
+			pathID: false,
+			fail:   false,
 		},
 		{
 			name:  "nlri 4",
@@ -88,7 +90,8 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 					},
 				},
 			},
-			fail: false,
+			pathID: true,
+			fail:   false,
 		},
 		{
 			name:  "nlri 5 L3VPN IPv6",
@@ -96,7 +99,6 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 			expect: &base.MPNLRI{
 				NLRI: []base.Route{
 					{
-						PathID: 0,
 						Length: 64,
 						Label: []*base.Label{
 							{
@@ -112,7 +114,6 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 						Prefix: []byte{0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55},
 					},
 					{
-						PathID: 0,
 						Length: 128,
 						Label: []*base.Label{
 							{
@@ -128,7 +129,6 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 						Prefix: []byte{0x01, 0x72, 0x00, 0x31, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06},
 					},
 					{
-						PathID: 0,
 						Length: 120,
 						Label: []*base.Label{
 							{
@@ -145,7 +145,8 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 					},
 				},
 			},
-			fail: false,
+			pathID: false,
+			fail:   false,
 		},
 		{
 			name:  "srv6 based l3vpn",
@@ -169,13 +170,81 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 					},
 				},
 			},
-			fail: false,
-			srv6: true,
+			fail:   false,
+			srv6:   true,
+			pathID: false,
+		},
+		{
+			name:  "crash_11-02-2022",
+			input: []byte{0x70, 0x05, 0xDC, 0x51, 0x00, 0x00, 0x02, 0xBC, 0x00, 0x00, 0x02, 0xBC, 0x0A, 0x46, 0x46},
+			expect: &base.MPNLRI{
+				NLRI: []base.Route{
+					{
+						Length: 24,
+						Label: []*base.Label{
+							{
+								Value: 24005,
+								Exp:   0,
+								BoS:   true,
+							},
+						},
+						RD: &base.RD{
+							Type:  0,
+							Value: []byte{2, 188, 0, 0, 2, 188},
+						},
+						Prefix: []byte{10, 70, 70},
+					},
+				},
+			},
+			fail:   false,
+			srv6:   false,
+			pathID: true,
+		},
+		{
+			name:  "crash_11-03-2022",
+			input: []byte{0x77, 0x05, 0xDD, 0x31, 0x00, 0x01, 0x0A, 0x00, 0x00, 0x07, 0x00, 0x01, 0xAC, 0x10, 0x07, 0x00, 0x70, 0x05, 0xDD, 0x31, 0x00, 0x01, 0x0A, 0x00, 0x00, 0x07, 0x00, 0x01, 0x64, 0x64, 0x07},
+			expect: &base.MPNLRI{
+				NLRI: []base.Route{
+					{
+						Length: 32,
+						Label: []*base.Label{
+							{
+								Value: 24019,
+								Exp:   0,
+								BoS:   true,
+							},
+						},
+						RD: &base.RD{
+							Type:  1,
+							Value: []byte{10, 0, 0, 7, 0, 1},
+						},
+						Prefix: []byte{172, 16, 7, 0},
+					},
+					{
+						Length: 24,
+						Label: []*base.Label{
+							{
+								Value: 24019,
+								Exp:   0,
+								BoS:   true,
+							},
+						},
+						RD: &base.RD{
+							Type:  1,
+							Value: []byte{10, 0, 0, 7, 0, 1},
+						},
+						Prefix: []byte{100, 100, 7},
+					},
+				},
+			},
+			fail:   false,
+			srv6:   false,
+			pathID: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := UnmarshalL3VPNNLRI(tt.input, tt.srv6)
+			got, err := UnmarshalL3VPNNLRI(tt.input, tt.pathID, tt.srv6)
 			if err != nil && !tt.fail {
 				t.Fatalf("expected to succeed but failed with error: %+v", err)
 			}
@@ -184,7 +253,8 @@ func TestUnmarshalL3VPNNLRI(t *testing.T) {
 			}
 			if err == nil {
 				if !reflect.DeepEqual(got, tt.expect) {
-					t.Errorf("Expected label %+v does not match to actual label %+v", *tt.expect, got)
+					t.Logf("Differences: %+v", deep.Equal(tt.expect, got))
+					t.Fatal("test failed as expected nlri does not match actual nlri")
 				}
 			}
 		})
