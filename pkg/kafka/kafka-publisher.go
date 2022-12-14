@@ -39,6 +39,7 @@ const (
 	// topicNamespaceEnvVariableName is an optional environment variable
 	// to support namespacing of gobgmp Kafka topics.
 	topicNamespaceEnvVariableName = "TOPIC_NAMESPACE"
+	statsMessageTopic             = "gobmp.parsed.statistics"
 )
 
 var (
@@ -70,6 +71,7 @@ var (
 		flowspecMessageTopic,
 		flowspecMessageV4Topic,
 		flowspecMessageV6Topic,
+		statsMessageTopic,
 	}
 )
 
@@ -118,6 +120,8 @@ func (p *publisher) PublishMessage(t int, key []byte, msg []byte) error {
 		return p.produceMessage(flowspecMessageV4Topic, key, msg)
 	case bmp.FlowspecV6Msg:
 		return p.produceMessage(flowspecMessageV6Topic, key, msg)
+	case bmp.StatsReportMsg:
+		return p.produceMessage(statsMessageTopic, key, msg)
 	}
 
 	return fmt.Errorf("not implemented")

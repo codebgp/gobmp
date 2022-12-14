@@ -29,6 +29,7 @@ func (p *producer) producePeerMessage(op int, msg bmp.Message) {
 		m = PeerStateChange{
 			Action:         action,
 			RemoteASN:      msg.PeerHeader.PeerAS,
+			PeerType:       uint8(msg.PeerHeader.PeerType),
 			PeerRD:         msg.PeerHeader.GetPeerDistinguisherString(),
 			RemotePort:     int(peerUpMsg.RemotePort),
 			Timestamp:      msg.PeerHeader.GetPeerTimestamp(),
@@ -36,19 +37,20 @@ func (p *producer) producePeerMessage(op int, msg bmp.Message) {
 			AdvHolddown:    int(peerUpMsg.SentOpen.HoldTime),
 			RemoteHolddown: int(peerUpMsg.ReceivedOpen.HoldTime),
 		}
-		if msg.PeerHeader.FlagV {
-			m.IsIPv4 = false
-			m.RemoteIP = net.IP(msg.PeerHeader.PeerAddress).To16().String()
-			m.LocalIP = net.IP(peerUpMsg.LocalAddress).To16().String()
-			m.RemoteBGPID = net.IP(msg.PeerHeader.PeerBGPID).To16().String()
-			m.LocalBGPID = net.IP(peerUpMsg.SentOpen.BGPID).To16().String()
-		} else {
-			m.IsIPv4 = true
-			m.RemoteIP = net.IP(msg.PeerHeader.PeerAddress[12:]).To4().String()
-			m.LocalIP = net.IP(peerUpMsg.LocalAddress[12:]).To4().String()
-			m.RemoteBGPID = net.IP(msg.PeerHeader.PeerBGPID).To4().String()
-			m.LocalBGPID = net.IP(peerUpMsg.SentOpen.BGPID).To4().String()
+		if f, err := msg.PeerHeader.IsAdjRIBInPost(); err == nil {
+			m.IsAdjRIBInPost = f
 		}
+		if f, err := msg.PeerHeader.IsAdjRIBOutPost(); err == nil {
+			m.IsAdjRIBOutPost = f
+		}
+		if f, err := msg.PeerHeader.IsLocRIBFiltered(); err == nil {
+			m.IsLocRIBFiltered = f
+		}
+		m.RemoteIP = msg.PeerHeader.GetPeerAddrString()
+		m.RemoteBGPID = msg.PeerHeader.GetPeerBGPIDString()
+		m.LocalBGPID = net.IP(peerUpMsg.SentOpen.BGPID).To4().String()
+		m.IsIPv4 = !msg.PeerHeader.IsRemotePeerIPv6()
+		m.LocalIP = peerUpMsg.GetLocalAddressString()
 		// Saving local bgp speaker identities.
 		p.speakerIP = m.LocalIP
 		p.speakerHash = fmt.Sprintf("%x", md5.Sum([]byte(p.speakerIP)))
@@ -60,15 +62,26 @@ func (p *producer) producePeerMessage(op int, msg bmp.Message) {
 			// Local BGP speaker is 4 bytes AS capable
 			m.LocalASN = lasn
 		}
-		p.as4Capable = false
-		_, l4as := peerUpMsg.SentOpen.Is4BytesASCapable()
-		_, r4as := peerUpMsg.ReceivedOpen.Is4BytesASCapable()
-		if l4as && r4as {
-			// Both peers are AS 4 bytes capable
-			p.as4Capable = true
+		// Check if local router advertises AddPath Send/Receive for any AFI/SAFI,
+		// if map comes back empty no further AddPath Capability is needed
+		if lAddPath := peerUpMsg.SentOpen.AddPathCapability(); len(lAddPath) != 0 {
+			// Check if remote router advertises AddPath Send/Receive for any AFI/SAFI,
+			// if map comes back empty no further AddPath Capability is needed
+			if rAddPath := peerUpMsg.ReceivedOpen.AddPathCapability(); len(rAddPath) != 0 {
+				for k := range lAddPath {
+					// Enable AddPath only for AFI/SAFI types existing in both local and remote maps
+					if _, ok := rAddPath[k]; ok {
+						// AFI/SAFI type exists in both maps, which means both peers support Send/Receive of AddPath
+						p.addPathCapable[k] = true
+					}
+				}
+			}
 		}
 		m.AdvCapabilities = peerUpMsg.SentOpen.GetCapabilities()
 		m.RcvCapabilities = peerUpMsg.ReceivedOpen.GetCapabilities()
+		if glog.V(6) {
+			glog.Infof("producer for speaker ip: %s add path: %+v", p.speakerIP, p.addPathCapable)
+		}
 	} else {
 		peerDownMsg, ok := msg.Payload.(*bmp.PeerDownMessage)
 		if !ok {
@@ -78,21 +91,16 @@ func (p *producer) producePeerMessage(op int, msg bmp.Message) {
 		m = PeerStateChange{
 			Action:     "down",
 			RouterIP:   p.speakerIP,
+			PeerType:   uint8(msg.PeerHeader.PeerType),
 			RouterHash: p.speakerHash,
 			BMPReason:  int(peerDownMsg.Reason),
 			RemoteASN:  msg.PeerHeader.PeerAS,
 			PeerRD:     msg.PeerHeader.GetPeerDistinguisherString(),
 			Timestamp:  msg.PeerHeader.GetPeerTimestamp(),
 		}
-		if msg.PeerHeader.FlagV {
-			m.IsIPv4 = false
-			m.RemoteIP = net.IP(msg.PeerHeader.PeerAddress).To16().String()
-			m.RemoteBGPID = net.IP(msg.PeerHeader.PeerBGPID).To16().String()
-		} else {
-			m.IsIPv4 = true
-			m.RemoteIP = net.IP(msg.PeerHeader.PeerAddress[12:]).To4().String()
-			m.RemoteBGPID = net.IP(msg.PeerHeader.PeerBGPID).To4().String()
-		}
+		m.RemoteIP = msg.PeerHeader.GetPeerAddrString()
+		m.RemoteBGPID = msg.PeerHeader.GetPeerBGPIDString()
+		m.IsIPv4 = !msg.PeerHeader.IsRemotePeerIPv6()
 		m.InfoData = make([]byte, len(peerDownMsg.Data))
 		copy(m.InfoData, peerDownMsg.Data)
 

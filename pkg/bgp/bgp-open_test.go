@@ -16,7 +16,7 @@ func TestUnmarshalBGPOpenMessage(t *testing.T) {
 	}{
 		{
 			name:  "valid",
-			input: []byte{0, 91, 1, 4, 19, 206, 0, 90, 192, 168, 8, 8, 62, 2, 6, 1, 4, 0, 1, 0, 1, 2, 6, 1, 4, 0, 1, 0, 4, 2, 6, 1, 4, 0, 1, 0, 128, 2, 2, 128, 0, 2, 2, 2, 0, 2, 6, 65, 4, 0, 0, 19, 206, 2, 20, 5, 18, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1, 0, 128, 0, 2},
+			input: []byte{0, 91, 1, 4, 19, 206, 0, 90, 192, 168, 8, 8, 62, 2, 6, 1, 4, 0, 1, 0, 1, 2, 6, 1, 4, 0, 1, 0, 4, 2, 6, 1, 4, 0, 1, 0, 128, 2, 2, 128, 0, 2, 2, 2, 0, 2, 6, 65, 4, 0, 0, 19, 206, 2, 6, 69, 4, 1, 0, 134, 3, 2, 20, 5, 18, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1, 0, 128, 0, 2},
 			expect: &OpenMessage{
 				Length:  91,
 				Type:    1,
@@ -26,7 +26,7 @@ func TestUnmarshalBGPOpenMessage(t *testing.T) {
 				OptParamLen:        62,
 				OptionalParameters: []InformationalTLV{},
 				Capabilities: Capability{
-					1: []*capabilityData{
+					1: []*CapabilityData{
 						{
 							Description: "Multiprotocol Extensions for BGP-4 : afi=1 safi=1 Unicast IPv4",
 							Value:       []byte{0, 1, 0, 1},
@@ -40,25 +40,31 @@ func TestUnmarshalBGPOpenMessage(t *testing.T) {
 							Value:       []byte{0, 1, 0, 128},
 						},
 					},
-					2: []*capabilityData{
+					2: []*CapabilityData{
 						{
 							Description: "Route Refresh Capability for BGP-4",
 							Value:       []byte{},
 						},
 					},
-					5: []*capabilityData{
+					5: []*CapabilityData{
 						{
 							Description: "Extended Next Hop Encoding",
 							Value:       []byte{0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1, 0, 128, 0, 2},
 						},
 					},
-					65: []*capabilityData{
+					65: []*CapabilityData{
 						{
 							Description: "Support for 4-octet AS number capability",
 							Value:       []byte{0, 0, 19, 206},
 						},
 					},
-					128: []*capabilityData{
+					69: []*CapabilityData{
+						{
+							Description: "ADD-PATH Capability",
+							Value:       []byte{1, 0, 134, 3},
+						},
+					},
+					128: []*CapabilityData{
 						{
 							Description: "Prestandard Route Refresh (deprecated)",
 							Value:       []byte{},
@@ -72,19 +78,77 @@ func TestUnmarshalBGPOpenMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			message, err := UnmarshalBGPOpenMessage(tt.input)
-			if err != nil {
-				if !tt.fail {
-					t.Fatal("expected to succeed but failed")
-				}
+			if err != nil && !tt.fail {
+				t.Fatal("expected to succeed but failed")
 			}
-			if err == nil {
-				if tt.fail {
-					t.Fatal("expected to fail but succeeded")
-				}
+			if err == nil && tt.fail {
+				t.Fatal("expected to fail but succeeded")
+			}
+			if err != nil {
+				return
 			}
 			if !reflect.DeepEqual(message, tt.expect) {
-				t.Error("unmarshaled and expected messages do not much")
-				t.Errorf("Diffs: %+v", deep.Equal(message, tt.expect))
+				t.Logf("Diffs: %+v", deep.Equal(message, tt.expect))
+				t.Fatal("unmarshaled and expected messages do not much")
+			}
+		})
+	}
+}
+
+func TestAddPathCapability(t *testing.T) {
+	tests := []struct {
+		name          string
+		openMsgRaw    []byte
+		expectAddPath map[int]bool
+		fail          bool
+	}{
+		{
+			name:       "test 1",
+			openMsgRaw: []byte{0x00, 0x7B, 0x01, 0x04, 0x5B, 0xA0, 0x00, 0xB4, 0x0A, 0x00, 0x00, 0x0A, 0x5E, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x04, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x80, 0x02, 0x06, 0x01, 0x04, 0x00, 0x02, 0x00, 0x80, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x49, 0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x01, 0x86, 0xA0, 0x02, 0x0E, 0x45, 0x0C, 0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x04, 0x01, 0x00, 0x01, 0x80, 0x03, 0x02, 0x14, 0x05, 0x12, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02},
+			expectAddPath: map[int]bool{
+				NLRIMessageType(1, 1):   false,
+				NLRIMessageType(1, 4):   false,
+				NLRIMessageType(1, 128): true,
+			},
+			fail: false,
+		},
+		{
+			name:       "test 2",
+			openMsgRaw: []byte{0x00, 0x6F, 0x01, 0x04, 0x5B, 0xA0, 0x00, 0xB4, 0x0A, 0x00, 0x00, 0x10, 0x52, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x04, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x80, 0x02, 0x06, 0x01, 0x04, 0x00, 0x02, 0x00, 0x80, 0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x01, 0x86, 0xA0, 0x02, 0x0A, 0x45, 0x08, 0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x04, 0x01, 0x02, 0x14, 0x05, 0x12, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02},
+			expectAddPath: map[int]bool{
+				NLRIMessageType(1, 1): false,
+				NLRIMessageType(1, 4): false,
+			},
+			fail: false,
+		},
+		{
+			name:       "test 3",
+			openMsgRaw: []byte{0x00, 0x7F, 0x01, 0x04, 0x5B, 0xA0, 0x00, 0xB4, 0x0A, 0x00, 0x00, 0x09, 0x62, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x04, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x80, 0x02, 0x06, 0x01, 0x04, 0x00, 0x02, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x02, 0x00, 0x80, 0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x01, 0x86, 0xA0, 0x02, 0x12, 0x45, 0x10, 0x00, 0x01, 0x01, 0x01, 0x00, 0x01, 0x04, 0x01, 0x00, 0x01, 0x80, 0x01, 0x00, 0x02, 0x01, 0x01, 0x02, 0x14, 0x05, 0x12, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02},
+			expectAddPath: map[int]bool{
+				NLRIMessageType(1, 1):   false,
+				NLRIMessageType(1, 4):   false,
+				NLRIMessageType(1, 128): false,
+				NLRIMessageType(2, 1):   false,
+			},
+			fail: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			om, err := UnmarshalBGPOpenMessage(tt.openMsgRaw)
+			if err != nil && !tt.fail {
+				t.Fatal("expected to succeed but failed")
+			}
+			if err == nil && tt.fail {
+				t.Fatal("expected to fail but succeeded")
+			}
+			if err != nil {
+				return
+			}
+			apc := om.AddPathCapability()
+			if !reflect.DeepEqual(apc, tt.expectAddPath) {
+				t.Logf("Diffs: %+v", deep.Equal(apc, tt.expectAddPath))
+				t.Fatal("unmarshaled and expected messages do not much")
 			}
 		})
 	}
